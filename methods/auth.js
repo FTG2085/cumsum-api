@@ -3,26 +3,22 @@ const bcrypt = require('bcryptjs')
 const Joi = require('joi')
 const fs = require('fs')
 const axios = require('axios')
-const { UserData } = require('../userdata')
 const dotenv = require('dotenv')
 dotenv.config({ path: '../.env' })
 
-function registerAuthMethods(expressApp, validateToken) {
+function registerAuthMethods(expressApp, validateToken, UserData) {
     expressApp.post('/auth/login', async (req, res) => {
         // Returns if no username or password was entered
         if (!req.body.username || !req.body.password) return res.send('Username or password was not provided!')
         
         // Creates an instance of the Auth Database and returns if the username or password is wrong
-        const userData = new UserData()
         const { username, password } = req.body
-        const userID = userData.getUserID(username)
-        if (!userData.usernameExists(username)) return res.status(401).send('Invalid username or password!')
-        if (!bcrypt.compareSync(password, userData.getPasswordHash(userID))) return res.status(401).send('Invalid username or password!')
+        const userID = UserData.getUserID(username)
+        if (!UserData.usernameExists(username)) return res.status(401).send('Invalid username or password!')
+        if (!bcrypt.compareSync(password, UserData.getPasswordHash(userID))) return res.status(401).send('Invalid username or password!')
         
         // Signs a token 
         const token = jwt.sign({ username, userID }, process.env.JWT_SECRET, { expiresIn: '14d'} )
-    
-        delete userData
     
         // Sends a cookie containing the token to the browser if applicable
         res.cookie('auth-token', token, {
@@ -61,15 +57,14 @@ function registerAuthMethods(expressApp, validateToken) {
         }
     
         // Prepares the data to be added to the database
-        const userData = new UserData()
         const { username, password } = req.body
         const passwordHash = bcrypt.hashSync(password, 10)   // Hash the password
     
         // Checks if username already exists
-        if (userData.usernameExists(username)) return res.send('Username already exists!')
+        if (UserData.usernameExists(username)) return res.send('Username already exists!')
         
         // Adds user to database
-        userData.addUser(username, passwordHash)
+        UserData.addUser(username, passwordHash)
         res.send('User created successfully!')
     })
 
@@ -128,9 +123,7 @@ function registerAuthMethods(expressApp, validateToken) {
                 })
         
                 const { id, username, email } = userResponse.data
-        
-                const dataInstance = new UserData()
-                let userData = dataInstance.getUserData(user.userID)
+                let userData = UserData.getUserData(user.userID)
                 userData.auth.discord = {
                     accessToken: access_token,
                     refresh_token: refresh_token
@@ -138,7 +131,7 @@ function registerAuthMethods(expressApp, validateToken) {
                 userData.info.discord = {
                     id, username, email
                 }
-                dataInstance.setUserData(user.userID, userData)
+                UserData.setUserData(user.userID, userData)
                 
                 res.redirect(redirect)
             } catch (err) {

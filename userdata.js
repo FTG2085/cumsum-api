@@ -1,46 +1,45 @@
-const fs = require('fs')
+const Loki = require('lokijs')
+const dotenv = require('dotenv')
 const path = require('path')
+dotenv.config()
 
 class UserData {
-    #newInstance() {
-        return JSON.parse(fs.readFileSync(path.join(__dirname, 'database', 'userdata.json')))
+    constructor() {
+        this.db = new Loki(path.join(process.env.DATABASE_PATH, 'userdata.db'), {
+            autoload: true,
+            autoloadCallback: this.initializeDatabase,
+            autosave: true,
+            autosaveInterval: 4000
+        })
     }
 
-    #saveInstance(instance) {
-        return fs.writeFileSync(path.join(__dirname, 'database', 'userdata.json'), JSON.stringify(instance))
-    }
-
-    getPasswordHash(userID) {
-        let dataInstance = this.#newInstance()
-        return dataInstance[userID].auth.password
-    }
-
-    getUserData(userID) {
-        let dataInstance = this.#newInstance()
-        return dataInstance[userID]
-    }
-
-    getUserID(username) {
-        let dataInstance = this.#newInstance()
-        for (let i = 0; i < dataInstance.length; i++) {
-            if (dataInstance[i].info.username == username) {
-                return i
-            }
+    initializeDatabase = () => {
+        this.users = this.db.getCollection('users')
+        if (this.users === null) {
+            this.users = this.db.addCollection('users')
         }
     }
 
+    getPasswordHash(userID) {
+        const user = this.users.findOne({ '$loki': userID })
+        return user.auth.password
+    }
+
+    getUserData(userID) {
+        return this.users.findOne({ '$loki': userID })
+    }
+
+    getUserID(username) {
+        const user = this.users.findOne({ 'info.username': username })
+        return user ? user.$loki : null
+    }
+
     userIdExists(userID) {
-        let dataInstance = this.#newInstance()
-        return dataInstance.length >= userID
+        return this.users.findOne({ '$loki': userID }) !== null
     }
 
     usernameExists(username) {
-        let dataInstance = this.#newInstance()
-        let exists = false
-        dataInstance.forEach(user => {
-            if (user.info.username == username) exists = true
-        })
-        return exists
+        return this.users.findOne({ 'info.username': username }) !== null
     }
 
     addUser(username, passwordHash) {
@@ -57,19 +56,19 @@ class UserData {
                 role: 'MEMBER',
                 badges: [],
                 createdTime: Date.now()
-            }
+            },
+            logs: {}
         }
-        let dataInstance = this.#newInstance()
-        dataInstance.push(newUser)
-        this.#saveInstance(dataInstance)
+        this.users.insert(newUser)
     }
 
     setUserData(userID, data) {
-        let dataInstance = this.#newInstance()
-        dataInstance[userID] = data
-        this.#saveInstance(dataInstance)
+        const user = this.users.findOne({ '$loki': userID })
+        if (user) {
+            Object.assign(user, data)
+            this.users.update(user)
+        }
     }
-
 }
 
 module.exports = { UserData }

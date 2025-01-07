@@ -17,6 +17,7 @@ async function scrapeTags(url) {
         $(selector).each((index, element) => {
             tags.push($(element).html().toLowerCase())
         })
+        tags = tags.map(tag => tag.replace(/<[^>]*>/g, '').trim())
         return tags
     }
 
@@ -38,7 +39,7 @@ async function scrapeTags(url) {
             if (keyword!=null) tags.push(keyword)
         })
         $('.tag-type-general a').each((index, element) => {
-            if ($(element).attr('href').includes('?page=post')) tags.push($(element).html().toLowerCase())
+            if ($(element).attr('href').includes('?page=post')) tags.push($(element).text().toLowerCase())
         })
         tags.concat(findTagsBySelector('a[href^="/tags/"]'))
         tags.concat(findTagsBySelector('a[href^="/tag/"]'))
@@ -46,6 +47,7 @@ async function scrapeTags(url) {
         if (tags == []) {
             return null
         } else {
+            tags = tags.map(tag => tag.replace(/<[^>]*>/g, '').trim())
             return tags
         }
     }
@@ -57,7 +59,7 @@ async function scrapeTags(url) {
         case site.hostname.includes('rule34.xxx') || site.hostname.includes('gelbooru.com'):
             let tags = []
             $('.tag-type-general a').each((index, element) => {
-                if ($(element).attr('href').includes('?page=post')) tags.push($(element).html().toLowerCase())
+                if ($(element).attr('href').includes('?page=post')) tags.push($(element).html().toLowerCase().replace(/<[^>]*>/g, ''))
             })
             tagArr = tags
             break

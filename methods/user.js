@@ -1,22 +1,21 @@
 const Joi = require('joi')
-const { UserData } = require('../userdata')
-const permissions = require('./permissions')
 const dotenv = require('dotenv')
 dotenv.config({ path: '../.env' })
 
-function registerUserMethods(expressApp, validateToken) {
+function registerUserMethods(expressApp, validateToken, getActionUser, UserData) {
 
-    expressApp.get('/user/settings', validateToken, (req, res) => {
-        const permissionUserID = permissions.getUser(req)
-        if (permissionUserID.messagee !== undefined) return res.status(permissionUserID.messagee.code).send(permissionUserID.messagee.msg)
+    expressApp.get('/user/settings', validateToken, getActionUser, (req, res) => {
+        let userSettings = UserData.getUserData(req.actionUser.user).settings
 
-        let dataInstance = new UserData()
-        let userSettings = dataInstance.getUserData(permissionUserID.result).settings
+        if (req.actionUser.relation === 'other' && !req.admin) {
+            return res.status(403).send('You do not have permission to view other users settings!')
+        }
 
         res.status(200).json({ message: 'Success!', settings: userSettings })
     })
 
-    expressApp.patch('/user/settings/edit', validateToken, (req, res) => {
+    expressApp.patch('/user/settings/edit', validateToken, getActionUser, (req, res) => {
+
         const schema = Joi.object({
             logsPublic: Joi.bool()
         })
@@ -24,23 +23,25 @@ function registerUserMethods(expressApp, validateToken) {
         const result = schema.validate(req.body)
 
         if (result.error) return res.status(422).send('Invalid settings object!')
-        
-        const permissionUserID = permissions.getUser(req)
-        if (permissionUserID.messagee !== undefined) return res.status(permissionUserID.messagee.code).send(permissionUserID.messagee.msg)
 
-        let dataInstance = new UserData()
-        const data = dataInstance.getUserData(permissionUserID.result)
+        if (req.actionUser.relation === 'other' && !req.admin) {
+            return res.status(403).send('You do not have permission to edit other users settings!')
+        }
+
+        const data = UserData.getUserData(req.actionUser.user)
         data.settings = {...data.settings, ...result.value}
-        dataInstance.setUserData(permissionUserID.result, data)
+        UserData.setUserData(req.actionUser.user, data)
         res.status(200).json({ message: 'Success!', settings: data.settings })
     })
 
     expressApp.get('/user/info', validateToken, (req, res) => {
-        const permissionUserID = permissions.getUser(req)
-        if (permissionUserID.messagee !== undefined) return res.status(permissionUserID.messagee.code).send(permissionUserID.messagee.msg)
+        let userInfo = UserData.getUserData(req.actionUser.user).info
 
-        let dataInstance = new UserData()
-        let userInfo = dataInstance.getUserData(permissionUserID.result).info
+        if (req.actionUser.relation == 'other') {
+            if(userInfo.discord) {
+                delete userInfo.discord.email
+            }
+        }
 
         res.status(200).json({ message: 'Success!', info: userInfo })
     })

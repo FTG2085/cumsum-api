@@ -78,7 +78,7 @@ function registerAuthMethods(expressApp, validateToken, UserData) {
         // Adds user to database
         UserData.addUser(username, passwordHash)
         res.send('User created successfully!')
-        logging('post', '/auth/register', 400, 'Invalid username or password!', req.ip)
+        logging('post', '/auth/register', 200, 'User created successfully!', req.ip)
     })
 
     expressApp.get('/auth/discord/start', validateToken, (req, res) => {

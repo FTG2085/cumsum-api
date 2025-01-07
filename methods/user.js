@@ -38,7 +38,7 @@ function registerUserMethods(expressApp, validateToken, getActionUser, UserData)
         res.status(200).json({ message: 'Success!', settings: data.settings })
     })
 
-    expressApp.get('/user/info', validateToken, (req, res) => {
+    expressApp.get('/user/info', validateToken, getActionUser, (req, res) => {
         let userInfo = UserData.getUserData(req.actionUser.user).info
 
         if (req.actionUser.relation == 'other') {

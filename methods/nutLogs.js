@@ -2,6 +2,7 @@ const scraper = require('./scraper')
 const dates = require('date-fns')
 const Joi = require('joi')
 const dotenv = require('dotenv')
+const logging = require('../logging')
 dotenv.config({ path: '../.env' })
 
 function registerLogMethods(expressApp, validateAuthorization, getActionUser, UserData) {
@@ -23,9 +24,11 @@ function registerLogMethods(expressApp, validateAuthorization, getActionUser, Us
         const result = logSchema.validate(log)
 
         if (result.error) {
+            logging('post', '/logs/new', 422, 'Invalid or expire token!', req.ip, req.user.username)
             res.status(422).send('Invalid log format!')
         } else {
             if (req.actionUser.relation == 'other' && !req.admin) {
+                logging('post', '/logs/new', 403, 'You do not have permission to log for other users!', req.ip, req.user.username)
                 return res.status(403).send('You do not have permission to log for other users!')
             }
 
@@ -42,6 +45,7 @@ function registerLogMethods(expressApp, validateAuthorization, getActionUser, Us
             UserData.setUserData(req.actionUser.user, user)
 
             res.status(200).json({ message: 'Successfully logged!', log})
+            logging('post', '/logs/new', 200, 'Successfully logged!', req.ip, req.user.username)
         }
     })
 
@@ -49,12 +53,19 @@ function registerLogMethods(expressApp, validateAuthorization, getActionUser, Us
         let user = UserData.getUserData(req.actionUser.user)
         if (user.logsPublic || req.admin) {
             if (req.query.filter) {
-                if (!user.logs[req.query.filter]) return res.status(404).send('No logs were found!')
+                if (!user.logs[req.query.filter]) {
+                    logging('get', '/logs/view', 404, 'No logs were found!', req.ip, req.user.username)
+                    return res.status(404).send('No logs were found!')
+                }
+                logging('get', '/logs/view', 200, 'Success!', req.ip, req.user.username)
                 return res.status(200).json({ message: 'Success!', logs: user.logs[req.query.filter] })
+            
             } else {
+                logging('get', '/logs/view', 200, 'Success!', req.ip, req.user.username)
                 return res.status(200).json({ message: 'Success!', logs: user.logs })
             }
         } else {
+            logging('get', '/logs/view', 403, "User's profile is set to private!", req.ip, req.user.username)
             res.status(403).send("User's profile is set to private!")
         }
     })

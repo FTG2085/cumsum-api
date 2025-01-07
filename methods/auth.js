@@ -4,18 +4,25 @@ const Joi = require('joi')
 const fs = require('fs')
 const axios = require('axios')
 const dotenv = require('dotenv')
+const logging = require('../logging')
 dotenv.config({ path: '../.env' })
 
 function registerAuthMethods(expressApp, validateToken, UserData) {
     expressApp.post('/auth/login', async (req, res) => {
         // Returns if no username or password was entered
-        if (!req.body.username || !req.body.password) return res.send('Username or password was not provided!')
+        if (!req.body.username || !req.body.password) {
+            logging('post', '/auth/login', 400, 'Username or password was not provided!', req.ip)
+            return res.status(400).send('Username or password was not provided!')
+        }
         
         // Creates an instance of the Auth Database and returns if the username or password is wrong
         const { username, password } = req.body
         const userID = UserData.getUserID(username)
-        if (!UserData.usernameExists(username)) return res.status(401).send('Invalid username or password!')
-        if (!bcrypt.compareSync(password, UserData.getPasswordHash(userID))) return res.status(401).send('Invalid username or password!')
+        if (!UserData.usernameExists(username)) {
+            logging('post', '/auth/login', 401, 'Invalid username or password!', req.ip)
+            return res.status(401).send('Invalid username or password!') 
+        } 
+        if (!bcrypt.compareSync(password, UserData.getPasswordHash(userID))) return res.status(401).send('Invalid username or password!'); logging('post', '/auth/login', 401, 'Invalid username or password!', req.ip)
         
         // Signs a token 
         const token = jwt.sign({ username, userID }, process.env.JWT_SECRET, { expiresIn: '14d'} )
@@ -29,12 +36,16 @@ function registerAuthMethods(expressApp, validateToken, UserData) {
     
         // Sends the token back to the client
         res.json({ message: 'Login successful!', token })
+        logging('post', '/auth/login', 200, 'Login successful!', req.ip)
     })
     
     expressApp.post('/auth/register', async (req, res) => {
         // If username or password is not present, returns.
-        if (!req.body.username || !req.body.password) return res.send('Username or password was not provided!')
-    
+        if (!req.body.username || !req.body.password) {
+            logging('post', '/auth/register', 400, 'Username or password was not provided!', req.ip)
+            return res.status(400).send('Username or password was not provided!');
+        }
+
         // Create schema to restrict username and passwords
         const schema = Joi.object({
             username: Joi
@@ -53,6 +64,7 @@ function registerAuthMethods(expressApp, validateToken, UserData) {
     
         // Return if invalid username/password
         if (result.error) {
+            logging('post', '/auth/register', 400, 'Username or password was not provided!', req.ip)
             return res.status(422).send('Invalid username/password!')
         }
     
@@ -66,10 +78,14 @@ function registerAuthMethods(expressApp, validateToken, UserData) {
         // Adds user to database
         UserData.addUser(username, passwordHash)
         res.send('User created successfully!')
+        logging('post', '/auth/register', 400, 'Invalid username or password!', req.ip)
     })
 
     expressApp.get('/auth/discord/start', validateToken, (req, res) => {
-        if (!req.query.redirect) return res.status(400).send('Missing URI redirect!')
+        if (!req.query.redirect) {
+            logging('get', '/auth/discord/start', 400, 'Missing URI redirect!', req.ip, req.user.username)
+            return res.status(400).send('Missing URI redirect!')
+        }
         const oauthRefs = JSON.parse(fs.readFileSync('./database/oauthReferences.json'))
         const referenceID = crypto.randomUUID()
         const state = { ref: referenceID, r: req.query.redirect }
@@ -83,8 +99,14 @@ function registerAuthMethods(expressApp, validateToken, UserData) {
     })
 
     expressApp.get('/auth/discord/callback', (req, res) => {
-        if (!req.query.code) return res.status(400).send('Missing authorization code!')
-        if (!req.query.state) return res.status(400).send('Missing state!')
+        if (!req.query.code) {
+            logging('get', '/auth/discord/callback', 400, 'Missing authorization code!', req.ip)
+            return res.status(400).send('Missing authorization code!')
+        }
+        if (!req.query.state) {
+            logging('get', '/auth/discord/callback', 400, 'Missing state!', req.ip)
+            return res.status(400).send('Missing state!')
+        }
 
         const state = JSON.parse(Buffer.from(req.query.state, 'base64').toString('utf-8'))
         let oauthRefs = JSON.parse(fs.readFileSync('./database/oauthReferences.json'))
@@ -94,12 +116,16 @@ function registerAuthMethods(expressApp, validateToken, UserData) {
             delete oauthRefs[state.ref]
             fs.writeFileSync('./database/oauthReferences.json', JSON.stringify(oauthRefs))
         } else {
+            logging('get', '/auth/discord/callback', 401, 'Invalid token reference!', req.ip)
             return res.status(401).send('Invalid token reference!')
         }
         let redirect = state.r
 
         jwt.verify(token, process.env.JWT_SECRET, async (err, user) => {
-            if (err) return res.status(401).send('Invalid or expired token')
+            if (err) {
+                logging('get', '/auth/discord/callback', 401, 'Invalid or expire token!', req.ip)
+                return res.status(401).send('Invalid or expired token')
+            }
 
             const { CLIENT_SECRET, CLIENT_ID, REDIRECT_URI } = process.env
         

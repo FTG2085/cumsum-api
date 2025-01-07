@@ -3,6 +3,7 @@ const fs = require('fs')
 const { URL } = require('node:url')
 const axios = require('axios')
 const dotenv = require('dotenv')
+const logging = require('../logging')
 dotenv.config({ path: '../.env' })
 
 async function scrapeTags(url) {
@@ -89,8 +90,12 @@ async function scrapeTags(url) {
 
 function registerScrapeMethod(expressApp, validateToken) {
     expressApp.get('/scraper', validateToken, (req, res) => {
-        if (!req.query.url) return res.status(422).send('No url provided!')
+        if (!req.query.url) {
+            logging('get', '/scraper', 422, 'No url provided!', req.ip, req.user.username)
+            return res.status(422).send('No url provided!')
+        }
         const tags = scrapeTags(decodeURIComponent(req.query.url))
+        logging('get', '/scraper', 200, 'Success!', req.ip, req.user.username)
         res.status(200).json({ message: 'Success!', tags })
     })
 }

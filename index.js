@@ -5,6 +5,7 @@ const cookieParser = require('cookie-parser')
 const dotenv = require('dotenv')
 const { UserData } = require('./userdata')
 const { rateLimit } = require('express-rate-limit')
+const chalk = require('chalk')
 
 const auth = require('./methods/auth')
 const user = require('./methods/user')
@@ -103,5 +104,5 @@ nutLogs.registerLogMethods(app, authenticateToken, getActionUser, userData)
 
 // Start server
 app.listen(PORT, () => {
-    console.log(`Listening on http://localhost:${PORT}`)
+    console.log(chalk.greenBright(`Server is running on port ${PORT}`))
 })
